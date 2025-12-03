@@ -18,7 +18,7 @@ public class CreateLotteryTables : Migration
 				.WithColumn("winner_name").AsString(128).Nullable()
 				.WithColumn("winner_amount").AsInt64().Nullable()
 				.WithColumn("is_completed").AsBoolean().NotNullable().WithDefaultValue(false)
-				.WithColumn("created_at").AsDateTime().NotNullable().WithDefault(SystemMethods.CurrentUTCDateTime);
+				.WithColumn("created_at").AsDateTime().NotNullable();
 
 			Create.Index("ix_lottery_draws_completed").OnTable("k4_lottery_draws").OnColumn("is_completed");
 			Create.Index("ix_lottery_draws_end_date").OnTable("k4_lottery_draws").OnColumn("end_date");
@@ -32,7 +32,7 @@ public class CreateLotteryTables : Migration
 				.WithColumn("steam_id").AsInt64().NotNullable()
 				.WithColumn("player_name").AsString(128).NotNullable()
 				.WithColumn("ticket_count").AsInt32().NotNullable().WithDefaultValue(1)
-				.WithColumn("purchased_at").AsDateTime().NotNullable().WithDefault(SystemMethods.CurrentUTCDateTime);
+				.WithColumn("purchased_at").AsDateTime().NotNullable();
 
 			Create.Index("ix_lottery_tickets_draw").OnTable("k4_lottery_tickets").OnColumn("draw_id");
 			Create.Index("ix_lottery_tickets_steam").OnTable("k4_lottery_tickets").OnColumn("steam_id");
