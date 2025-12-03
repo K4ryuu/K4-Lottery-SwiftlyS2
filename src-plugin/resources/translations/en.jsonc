@@ -1,0 +1,49 @@
+{
+  // General
+  "k4.general.prefix": "[silver][ [lime]Lottery [silver]]",
+
+  // Help
+  "k4.lottery.help.header": "[lime]=== Lottery Commands",
+  "k4.lottery.help.buy": "[grey]> [olive]!lottery buy [amount][silver] - Buy lottery tickets",
+  "k4.lottery.help.info": "[grey]> [olive]!lottery info[silver] - View current lottery info",
+  "k4.lottery.help.top": "[grey]> [olive]!lottery top[silver] - View top winners",
+  "k4.lottery.help.history": "[grey]> [olive]!lottery history[silver] - View recent draws",
+  "k4.lottery.help.footer": "[lime]===",
+
+  // Errors
+  "k4.lottery.error.economy_unavailable": "[lightred]Economy system is not available.",
+  "k4.lottery.error.max_tickets": "[lightred]You already have the maximum tickets ({0}).",
+  "k4.lottery.error.insufficient_funds": "[lightred]Not enough funds! Need [gold]{0}[lightred], have [gold]{1}[lightred].",
+  "k4.lottery.error.no_draw": "[lightred]No active lottery draw.",
+  "k4.lottery.error.purchase_failed": "[lightred]Failed to purchase tickets. Please try again.",
+
+  // Success
+  "k4.lottery.success.bought": "[lime]Purchased [gold]{0}[lime] ticket(s) for [gold]{1}[lime] credits! Total: [gold]{2}[lime] tickets.",
+
+  // Info
+  "k4.lottery.info.header": "[lime]=== Current Lottery",
+  "k4.lottery.info.pot": "[grey]> [silver]Total Pot: [gold]{0}[silver] (Winner gets: [lime]{1}[silver])",
+  "k4.lottery.info.tickets": "[grey]> [silver]Total Tickets: [lime]{0}[silver] | Participants: [lime]{1}",
+  "k4.lottery.info.your_tickets": "[grey]> [silver]Your Tickets: [lime]{0}[silver]/[lime]{1}",
+  "k4.lottery.info.win_chance": "[grey]> [silver]Win Chance: [yellow]{0:F1}%",
+  "k4.lottery.info.time_left": "[grey]> [silver]Draw in: [orange]{0}",
+  "k4.lottery.info.ticket_price": "[grey]> [silver]Ticket Price: [gold]{0}",
+
+  // Top
+  "k4.lottery.top.header": "[lime]=== Top Lottery Winners",
+  "k4.lottery.top.empty": "[grey]> [silver]No winners yet.",
+  "k4.lottery.top.item": "[grey]> [gold]#{0}[silver] {1} - [lime]{2}[silver] credits ({3} wins)",
+
+  // History
+  "k4.lottery.history.header": "[lime]=== Recent Lottery Draws",
+  "k4.lottery.history.empty": "[grey]> [silver]No completed draws yet.",
+  "k4.lottery.history.item": "[grey]> [gold]#{0}[silver] {1} won [lime]{2}[silver] credits ({3})",
+
+  // Announcements
+  "k4.lottery.announce.winner": "[lime][LOTTERY][silver] {0} won [gold]{1}[silver] credits! (Pot: {2})",
+
+  // Time formatting
+  "k4.lottery.time.days": "{0}d {1}h {2}m",
+  "k4.lottery.time.hours": "{0}h {1}m",
+  "k4.lottery.time.minutes": "{0}m"
+}
