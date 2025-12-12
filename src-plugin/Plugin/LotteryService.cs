@@ -1,21 +1,23 @@
 using System.Security.Cryptography;
+using K4_Lottery.Config;
 using K4_Lottery.Database;
 using Microsoft.Extensions.Logging;
+using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.Players;
 
 namespace K4_Lottery;
 
-public sealed class LotteryService
+public sealed class LotteryService(Plugin plugin, DatabaseService database)
 {
-	private readonly Plugin _plugin;
-	private readonly DatabaseService _database;
+	private readonly Plugin _plugin = plugin;
+	private readonly DatabaseService _database = database;
 	private DateTime _lastDrawCheck = DateTime.MinValue;
 
-	public LotteryService(Plugin plugin, DatabaseService database)
-	{
-		_plugin = plugin;
-		_database = database;
+	private static ISwiftlyCore Core => Plugin.Core;
+	private static LotteryConfig Config => Plugin.Lottery.CurrentValue;
 
+	public void Initialize()
+	{
 		Task.Run(EnsureCurrentDrawAsync);
 	}
 
@@ -28,11 +30,11 @@ public sealed class LotteryService
 		if (draw == null)
 		{
 			await CreateNewDrawAsync();
-			Plugin.Core.Logger.LogInformation("K4-Lottery: Created new lottery draw.");
+			Core.Logger.LogInformation("K4-Lottery: Created new lottery draw.");
 		}
 		else
 		{
-			Plugin.Core.Logger.LogInformation("K4-Lottery: Existing draw found, ends at {EndDate}.", draw.EndDate);
+			Core.Logger.LogInformation("K4-Lottery: Existing draw found, ends at {EndDate}.", draw.EndDate);
 		}
 	}
 
@@ -43,20 +45,20 @@ public sealed class LotteryService
 		return await _database.CreateDrawAsync(now, endDate);
 	}
 
-	private DateTime CalculateNextDrawDate(DateTime from)
+	private static DateTime CalculateNextDrawDate(DateTime from)
 	{
-		var drawTime = TimeSpan.Parse(_plugin.Lottery.DrawTime);
-		var nextDraw = from.Date.Add(drawTime).AddDays(_plugin.Lottery.DrawIntervalDays);
+		var drawTime = TimeSpan.Parse(Config.DrawTime);
+		var nextDraw = from.Date.Add(drawTime).AddDays(Config.DrawIntervalDays);
 
 		if (nextDraw <= from)
-			nextDraw = nextDraw.AddDays(_plugin.Lottery.DrawIntervalDays);
+			nextDraw = nextDraw.AddDays(Config.DrawIntervalDays);
 
 		return nextDraw;
 	}
 
 	public async Task BuyTicketsAsync(IPlayer player, string[] args)
 	{
-		var localizer = Plugin.Core.Translation.GetPlayerLocalizer(player);
+		var localizer = Core.Translation.GetPlayerLocalizer(player);
 
 		if (!_database.IsEnabled || _plugin.EconomyAPI == null)
 		{
@@ -74,19 +76,19 @@ public sealed class LotteryService
 		var existingTicket = await _database.GetPlayerTicketAsync(draw.Id, player.SteamID);
 		var currentCount = existingTicket?.TicketCount ?? 0;
 
-		if (currentCount + count > _plugin.Lottery.MaxTicketsPerPlayer)
+		if (currentCount + count > Config.MaxTicketsPerPlayer)
 		{
-			var canBuy = _plugin.Lottery.MaxTicketsPerPlayer - currentCount;
+			var canBuy = Config.MaxTicketsPerPlayer - currentCount;
 			if (canBuy <= 0)
 			{
-				SendAsync(player, WithPrefix(localizer, localizer["k4.lottery.error.max_tickets", _plugin.Lottery.MaxTicketsPerPlayer]));
+				SendAsync(player, WithPrefix(localizer, localizer["k4.lottery.error.max_tickets", Config.MaxTicketsPerPlayer]));
 				return;
 			}
 			count = canBuy;
 		}
 
-		var totalCost = count * _plugin.Lottery.TicketPrice;
-		var balance = _plugin.EconomyAPI.GetPlayerBalance(player.SteamID, _plugin.Lottery.WalletKind);
+		var totalCost = count * Config.TicketPrice;
+		var balance = _plugin.EconomyAPI.GetPlayerBalance(player.SteamID, Config.WalletKind);
 
 		if (balance < totalCost)
 		{
@@ -97,21 +99,21 @@ public sealed class LotteryService
 		try
 		{
 			await _database.BuyTicketsAsync(draw.Id, player.SteamID, player.Controller.PlayerName, count, totalCost);
-			_plugin.EconomyAPI.SubtractPlayerBalance(player.SteamID, _plugin.Lottery.WalletKind, (int)totalCost);
+			_plugin.EconomyAPI.SubtractPlayerBalance(player.SteamID, Config.WalletKind, (int)totalCost);
 
 			var newTotal = currentCount + count;
 			SendAsync(player, WithPrefix(localizer, localizer["k4.lottery.success.bought", count, totalCost, newTotal]));
 		}
 		catch (Exception ex)
 		{
-			Plugin.Core.Logger.LogError(ex, "K4-Lottery: Failed to buy tickets for {SteamId}", player.SteamID);
+			Core.Logger.LogError(ex, "K4-Lottery: Failed to buy tickets for {SteamId}", player.SteamID);
 			SendAsync(player, WithPrefix(localizer, localizer["k4.lottery.error.purchase_failed"]));
 		}
 	}
 
 	public async Task ShowInfoAsync(IPlayer player)
 	{
-		var localizer = Plugin.Core.Translation.GetPlayerLocalizer(player);
+		var localizer = Core.Translation.GetPlayerLocalizer(player);
 
 		if (!_database.IsEnabled)
 		{
@@ -129,35 +131,35 @@ public sealed class LotteryService
 		var playerTicket = await _database.GetPlayerTicketAsync(draw.Id, player.SteamID);
 		var totalTickets = await _database.GetTotalTicketsAsync(draw.Id);
 		var participants = await _database.GetParticipantCountAsync(draw.Id);
-		var winnerPot = (long)(draw.TotalPot * _plugin.Lottery.WinnerPercentage / 100);
+		var winnerPot = (long)(draw.TotalPot * Config.WinnerPercentage / 100);
 		var timeLeft = draw.EndDate - DateTime.UtcNow;
 
 		var playerTicketCount = playerTicket?.TicketCount ?? 0;
 		var winChance = totalTickets > 0 ? (double)playerTicketCount / totalTickets * 100 : 0;
 
-		Plugin.Core.Scheduler.NextWorldUpdate(() =>
+		Core.Scheduler.NextWorldUpdate(() =>
 		{
 			if (!player.IsValid) return;
 			player.SendChat(localizer["k4.lottery.info.header"]);
 			player.SendChat(localizer["k4.lottery.info.pot", draw.TotalPot, winnerPot]);
 			player.SendChat(localizer["k4.lottery.info.tickets", totalTickets, participants]);
-			player.SendChat(localizer["k4.lottery.info.your_tickets", playerTicketCount, _plugin.Lottery.MaxTicketsPerPlayer]);
+			player.SendChat(localizer["k4.lottery.info.your_tickets", playerTicketCount, Config.MaxTicketsPerPlayer]);
 			player.SendChat(localizer["k4.lottery.info.win_chance", winChance]);
 			player.SendChat(localizer["k4.lottery.info.time_left", FormatTimeSpan(localizer, timeLeft)]);
-			player.SendChat(localizer["k4.lottery.info.ticket_price", _plugin.Lottery.TicketPrice]);
+			player.SendChat(localizer["k4.lottery.info.ticket_price", Config.TicketPrice]);
 		});
 	}
 
 	public async Task ShowTopAsync(IPlayer player)
 	{
-		var localizer = Plugin.Core.Translation.GetPlayerLocalizer(player);
+		var localizer = Core.Translation.GetPlayerLocalizer(player);
 
 		if (!_database.IsEnabled)
 			return;
 
 		var topWinners = await _database.GetTopWinnersAsync(10);
 
-		Plugin.Core.Scheduler.NextWorldUpdate(() =>
+		Core.Scheduler.NextWorldUpdate(() =>
 		{
 			if (!player.IsValid) return;
 			player.SendChat(localizer["k4.lottery.top.header"]);
@@ -178,14 +180,14 @@ public sealed class LotteryService
 
 	public async Task ShowHistoryAsync(IPlayer player)
 	{
-		var localizer = Plugin.Core.Translation.GetPlayerLocalizer(player);
+		var localizer = Core.Translation.GetPlayerLocalizer(player);
 
 		if (!_database.IsEnabled)
 			return;
 
 		var recentDraws = await _database.GetRecentDrawsAsync(5);
 
-		Plugin.Core.Scheduler.NextWorldUpdate(() =>
+		Core.Scheduler.NextWorldUpdate(() =>
 		{
 			if (!player.IsValid) return;
 			player.SendChat(localizer["k4.lottery.history.header"]);
@@ -241,13 +243,13 @@ public sealed class LotteryService
 
 		var winnerIndex = RandomNumberGenerator.GetInt32(ticketPool.Count);
 		var winner = ticketPool[winnerIndex];
-		var winnerAmount = (long)(draw.TotalPot * _plugin.Lottery.WinnerPercentage / 100);
+		var winnerAmount = (long)(draw.TotalPot * Config.WinnerPercentage / 100);
 
 		await _database.CompleteDrawAsync(draw.Id, winner.SteamId, winner.PlayerName, winnerAmount);
 
-		_plugin.EconomyAPI?.AddPlayerBalance(winner.SteamId, _plugin.Lottery.WalletKind, (int)winnerAmount);
+		_plugin.EconomyAPI?.AddPlayerBalance(winner.SteamId, Config.WalletKind, (int)winnerAmount);
 
-		Plugin.Core.Logger.LogInformation("K4-Lottery: {WinnerName} ({SteamId}) won {Amount} credits (Pot: {Pot})",
+		Core.Logger.LogInformation("K4-Lottery: {WinnerName} ({SteamId}) won {Amount} credits (Pot: {Pot})",
 			winner.PlayerName, winner.SteamId, winnerAmount, draw.TotalPot);
 
 		AnnounceWinner(winner.PlayerName, winnerAmount, draw.TotalPot);
@@ -255,22 +257,22 @@ public sealed class LotteryService
 		await CreateNewDrawAsync();
 	}
 
-	private static void AnnounceWinner(string winnerName, long amount, long totalPot)
+	private void AnnounceWinner(string winnerName, long amount, long totalPot)
 	{
-		Plugin.Core.Scheduler.NextWorldUpdate(() =>
+		Core.Scheduler.NextWorldUpdate(() =>
 		{
-			foreach (var player in Plugin.Core.PlayerManager.GetAllPlayers())
+			foreach (var player in Core.PlayerManager.GetAllPlayers())
 			{
 				if (!player.IsValid) continue;
-				var localizer = Plugin.Core.Translation.GetPlayerLocalizer(player);
+				var localizer = Core.Translation.GetPlayerLocalizer(player);
 				player.SendChat(localizer["k4.lottery.announce.winner", winnerName, amount, totalPot]);
 			}
 		});
 	}
 
-	private static void SendAsync(IPlayer player, string message)
+	private void SendAsync(IPlayer player, string message)
 	{
-		Plugin.Core.Scheduler.NextWorldUpdate(() =>
+		Core.Scheduler.NextWorldUpdate(() =>
 		{
 			if (player.IsValid)
 				player.SendChat(message);

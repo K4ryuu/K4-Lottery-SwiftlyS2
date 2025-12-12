@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace K4_Lottery.Database;
@@ -5,6 +6,7 @@ namespace K4_Lottery.Database;
 [Table("k4_lottery_draws")]
 public sealed class LotteryDraw
 {
+	[Key]
 	[Column("id")]
 	public int Id { get; set; }
 
@@ -36,6 +38,7 @@ public sealed class LotteryDraw
 [Table("k4_lottery_tickets")]
 public sealed class LotteryTicket
 {
+	[Key]
 	[Column("id")]
 	public int Id { get; set; }
 
@@ -58,6 +61,7 @@ public sealed class LotteryTicket
 [Table("k4_lottery_history")]
 public sealed class LotteryHistory
 {
+	[Key]
 	[Column("id")]
 	public int Id { get; set; }
 

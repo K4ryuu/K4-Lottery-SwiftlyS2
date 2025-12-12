@@ -13,17 +13,21 @@ namespace K4_Lottery;
 
 [PluginMetadata(
 	Id = "k4.lottery",
-	Version = "1.0.0",
+	Version = "1.0.1",
 	Name = "K4 - Lottery",
 	Author = "K4ryuu",
 	Description = "Lottery system with ticket purchases and periodic draws"
 )]
 public sealed class Plugin(ISwiftlyCore core) : BasePlugin(core)
 {
-	public static new ISwiftlyCore Core { get; private set; } = null!;
+	private const string LotteryConfigFileName = "config.json";
+	private const string LotteryConfigSection = "K4Lottery";
+	private const string CommandsConfigFileName = "commands.json";
+	private const string CommandsConfigSection = "K4LotteryCommands";
 
-	internal LotteryConfig Lottery { get; private set; } = null!;
-	internal CommandsConfig Commands { get; private set; } = null!;
+	public static new ISwiftlyCore Core { get; private set; } = null!;
+	public static IOptionsMonitor<LotteryConfig> Lottery { get; private set; } = null!;
+	public static IOptionsMonitor<CommandsConfig> Commands { get; private set; } = null!;
 
 	private DatabaseService _database = null!;
 	private LotteryService _lotteryService = null!;
@@ -57,45 +61,54 @@ public sealed class Plugin(ISwiftlyCore core) : BasePlugin(core)
 		}
 
 		EconomyAPI = interfaceManager.GetSharedInterface<IEconomyAPIv1>("Economy.API.v1");
-		EconomyAPI.EnsureWalletKind(Lottery.WalletKind);
+		EconomyAPI.EnsureWalletKind(Lottery.CurrentValue.WalletKind);
 	}
 
-	private void InitializeConfigs()
-	{
-		Lottery = BuildConfigService<LotteryConfig>("config.json", "K4Lottery").Value;
-		Commands = BuildConfigService<CommandsConfig>("commands.json", "K4LotteryCommands").Value;
-	}
-
-	private static IOptions<T> BuildConfigService<T>(string fileName, string sectionName) where T : class, new()
+	private static void InitializeConfigs()
 	{
 		Core.Configuration
-			.InitializeJsonWithModel<T>(fileName, sectionName)
-			.Configure(cfg => cfg.AddJsonFile(Core.Configuration.GetConfigPath(fileName), optional: false, reloadOnChange: true));
+			.InitializeJsonWithModel<LotteryConfig>(LotteryConfigFileName, LotteryConfigSection)
+			.Configure(builder =>
+			{
+				builder.AddJsonFile(LotteryConfigFileName, optional: false, reloadOnChange: true);
+			});
+
+		Core.Configuration
+			.InitializeJsonWithModel<CommandsConfig>(CommandsConfigFileName, CommandsConfigSection)
+			.Configure(builder =>
+			{
+				builder.AddJsonFile(CommandsConfigFileName, optional: false, reloadOnChange: true);
+			});
 
 		ServiceCollection services = new();
 		services.AddSwiftly(Core)
-			.AddOptionsWithValidateOnStart<T>()
-			.BindConfiguration(sectionName);
+			.AddOptions<LotteryConfig>()
+			.BindConfiguration(LotteryConfigFileName);
+
+		services.AddOptions<CommandsConfig>()
+			.BindConfiguration(CommandsConfigFileName);
 
 		var provider = services.BuildServiceProvider();
-		return provider.GetRequiredService<IOptions<T>>();
+		Lottery = provider.GetRequiredService<IOptionsMonitor<LotteryConfig>>();
+		Commands = provider.GetRequiredService<IOptionsMonitor<CommandsConfig>>();
 	}
 
 	private void InitializeDatabase()
 	{
-		_database = new DatabaseService(Lottery.DatabaseConnection);
+		_database = new DatabaseService(Lottery.CurrentValue.DatabaseConnection);
 		Task.Run(async () => await _database.InitializeAsync());
 	}
 
 	private void InitializeServices()
 	{
 		_lotteryService = new LotteryService(this, _database);
+		_lotteryService.Initialize();
 	}
 
 	private void RegisterCommands()
 	{
-		Core.Command.RegisterCommand(Commands.Lottery.Name, OnLotteryCommand);
-		foreach (var alias in Commands.Lottery.Aliases)
+		Core.Command.RegisterCommand(Commands.CurrentValue.Lottery.Name, OnLotteryCommand);
+		foreach (var alias in Commands.CurrentValue.Lottery.Aliases)
 			Core.Command.RegisterCommand(alias, OnLotteryCommand);
 	}
 
@@ -115,13 +128,13 @@ public sealed class Plugin(ISwiftlyCore core) : BasePlugin(core)
 		var subCommand = args[0].ToLowerInvariant();
 		var subArgs = args.Skip(1).ToArray();
 
-		if (IsCommand(subCommand, Commands.Buy))
+		if (IsCommand(subCommand, Commands.CurrentValue.Buy))
 			Task.Run(async () => await _lotteryService.BuyTicketsAsync(player, subArgs));
-		else if (IsCommand(subCommand, Commands.Info))
+		else if (IsCommand(subCommand, Commands.CurrentValue.Info))
 			Task.Run(async () => await _lotteryService.ShowInfoAsync(player));
-		else if (IsCommand(subCommand, Commands.Top))
+		else if (IsCommand(subCommand, Commands.CurrentValue.Top))
 			Task.Run(async () => await _lotteryService.ShowTopAsync(player));
-		else if (IsCommand(subCommand, Commands.History))
+		else if (IsCommand(subCommand, Commands.CurrentValue.History))
 			Task.Run(async () => await _lotteryService.ShowHistoryAsync(player));
 		else
 			ShowHelp(player);
@@ -130,7 +143,7 @@ public sealed class Plugin(ISwiftlyCore core) : BasePlugin(core)
 	private static bool IsCommand(string input, CommandDefinition cmd)
 		=> input == cmd.Name || cmd.Aliases.Contains(input);
 
-	private static void ShowHelp(SwiftlyS2.Shared.Players.IPlayer player)
+	private void ShowHelp(SwiftlyS2.Shared.Players.IPlayer player)
 	{
 		var localizer = Core.Translation.GetPlayerLocalizer(player);
 		player.SendChat(localizer["k4.lottery.help.header"]);
