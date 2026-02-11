@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.2] - 2026-02-11
+
+### Fixed
+
+- **CRITICAL**: Fixed configuration binding bug in `InitializeConfigs()` method affecting **both** configs
+  - **LotteryConfig**: Changed `.BindConfiguration(LotteryConfigFileName)` to `.BindConfiguration(LotteryConfigSection)`
+  - **CommandsConfig**: Changed `.BindConfiguration(CommandsConfigFileName)` to `.BindConfiguration(CommandsConfigSection)`
+  - This bug caused all config values to use hardcoded defaults instead of reading from `config.json` and `commands.json`
+  - **Impact**: Plugin configuration was completely non-functional - ticket prices, draw intervals, wallet settings, and all commands were using defaults
+
 ## [1.0.1] - 2025-12-12
 
 ### Changed

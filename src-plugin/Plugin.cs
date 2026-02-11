@@ -13,7 +13,7 @@ namespace K4_Lottery;
 
 [PluginMetadata(
 	Id = "k4.lottery",
-	Version = "1.0.1",
+	Version = "1.0.2",
 	Name = "K4 - Lottery",
 	Author = "K4ryuu",
 	Description = "Lottery system with ticket purchases and periodic draws"
@@ -82,11 +82,11 @@ public sealed class Plugin(ISwiftlyCore core) : BasePlugin(core)
 
 		ServiceCollection services = new();
 		services.AddSwiftly(Core)
-			.AddOptions<LotteryConfig>()
-			.BindConfiguration(LotteryConfigFileName);
+			.AddOptionsWithValidateOnStart<LotteryConfig>()
+			.BindConfiguration(LotteryConfigSection);
 
-		services.AddOptions<CommandsConfig>()
-			.BindConfiguration(CommandsConfigFileName);
+		services.AddOptionsWithValidateOnStart<CommandsConfig>()
+			.BindConfiguration(CommandsConfigSection);
 
 		var provider = services.BuildServiceProvider();
 		Lottery = provider.GetRequiredService<IOptionsMonitor<LotteryConfig>>();
